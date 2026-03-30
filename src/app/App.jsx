@@ -9,7 +9,7 @@ const App = () => {
 
       </aside>
       <section className='w-3/4 bg-neutral-800 rounded-lg'>
-      <Editor height="90vh" defaultLanguage="javascript" defaultValue="// Write code here in JavaScript" theme="vs-dark" />
+      <Editor className='overflow-hidden' height="90vh" defaultLanguage="javascript" defaultValue="// Write code here in JavaScript" theme="vs-dark" />
 
       </section>
 
