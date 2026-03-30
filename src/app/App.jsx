@@ -1,4 +1,5 @@
 import React from 'react'
+import { Editor } from '@monaco-editor/react'
 import "./App.css"
 
 const App = () => {
@@ -8,6 +9,7 @@ const App = () => {
 
       </aside>
       <section className='w-3/4 bg-neutral-800 rounded-lg'>
+      <Editor height="90vh" defaultLanguage="javascript" defaultValue="// Write code here in JavaScript" theme="vs-dark" />
 
       </section>
 
