@@ -13,7 +13,7 @@ const App = () => {
 
   const handleMount = (editor) => {
     editorRef.current = editor;
-
+    // Showing real time updated between 2 users
     const provider = new SocketIOProvider(
       "http://localhost:8000", // ⚠️ match your backend port
       "monaco",
