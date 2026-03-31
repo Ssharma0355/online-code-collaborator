@@ -10,7 +10,9 @@ const App = () => {
 
   const ydoc = useMemo(() => new Y.Doc(), []);
   const yText = useMemo(() => ydoc.getText("monaco"), [ydoc]);
-  const [userName, setUserName] = useState("")
+  const [userName, setUserName] = useState(()=>{
+    return new URLSearchParams(window.location.search).get("userName")||""
+  })
 
   const handleMount = (editor) => {
     editorRef.current = editor;
@@ -33,6 +35,7 @@ const App = () => {
   const handleJoin = (e)=>{
     e.preventDefault();
     setUserName(e.target.userName.value)
+    window.history.pushState({}, "","?userName="+ e.target.userName.value)
 
   }
   if(!userName)
@@ -56,7 +59,9 @@ const App = () => {
 
   return (
     <main className='h-screen w-full bg-gray-950 flex gap-4 p-4'>
-      <aside className='h-full w-1/4 bg-amber-50 rounded-lg'></aside>
+      <aside className='h-full w-1/4 bg-amber-50 rounded-lg'>
+        <h1 className='p-2 font-bold border-lg'>{userName}</h1>
+      </aside>
 
       <section className='w-3/4 bg-neutral-800 rounded-lg'>
         <Editor
