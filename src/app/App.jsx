@@ -1,29 +1,29 @@
-import React, { useRef, useMemo, useState, useEffect } from 'react'
-import { Editor } from '@monaco-editor/react'
-import "./App.css"
-import { MonacoBinding } from "y-monaco"
-import * as Y from "yjs"
-import { SocketIOProvider } from "y-socket.io"
+import React, { useRef, useMemo, useState, useEffect } from "react";
+import { Editor } from "@monaco-editor/react";
+import "./App.css";
+import { MonacoBinding } from "y-monaco";
+import * as Y from "yjs";
+import { SocketIOProvider } from "y-socket.io";
 
 const App = () => {
   const editorRef = useRef(null);
   const providerRef = useRef(null);
-  const bindingRef = useRef(null); // ✅ prevent duplicate binding
+  const bindingRef = useRef(null);
 
   const ydoc = useMemo(() => new Y.Doc(), []);
   const yText = useMemo(() => ydoc.getText("monaco"), [ydoc]);
 
-  const [userName, setUserName] = useState(() => {
-    return new URLSearchParams(window.location.search).get("userName") || ""
-  });
+  const [userName, setUserName] = useState(
+    new URLSearchParams(window.location.search).get("userName") || ""
+  );
 
   const [users, setUsers] = useState([]);
+  const [output, setOutput] = useState("");
 
-  // ✅ Handle editor mount
+  // Mount editor
   const handleMount = (editor) => {
     editorRef.current = editor;
 
-    // Try binding if provider already exists
     if (providerRef.current && !bindingRef.current) {
       bindingRef.current = new MonacoBinding(
         yText,
@@ -34,35 +34,30 @@ const App = () => {
     }
   };
 
+  // Yjs setup
   useEffect(() => {
     if (!userName) return;
 
-    const provider = new SocketIOProvider(
-      "http://localhost:8000",
-      "monaco",
-      ydoc,
-      { autoConnect: true }
-    );
+    const provider = new SocketIOProvider("/", "monaco", ydoc, {
+      autoConnect: true,
+    });
 
     providerRef.current = provider;
 
-    // ✅ Set username
     provider.awareness.setLocalStateField("user", { userName });
 
-    // ✅ Awareness listener
     const handleAwarenessChange = () => {
       const states = Array.from(provider.awareness.getStates().values());
 
       setUsers(
         states
-          .filter(state => state.user?.userName)
-          .map(state => state.user)
+          .filter((s) => s.user?.userName)
+          .map((s) => s.user)
       );
     };
 
     provider.awareness.on("change", handleAwarenessChange);
 
-    // ✅ Try binding if editor already mounted
     if (editorRef.current && !bindingRef.current) {
       bindingRef.current = new MonacoBinding(
         yText,
@@ -72,89 +67,128 @@ const App = () => {
       );
     }
 
-    const handleBeforeUnload = () => {
-      provider.awareness.setLocalStateField("user", null);
-    };
-
-    window.addEventListener("beforeunload", handleBeforeUnload);
-
     return () => {
       provider.disconnect();
       provider.awareness.off("change", handleAwarenessChange);
-      window.removeEventListener("beforeunload", handleBeforeUnload);
-
-      // ✅ destroy binding
       bindingRef.current?.destroy();
       bindingRef.current = null;
     };
   }, [userName, ydoc]);
 
+  // Run Code (iframe sandbox)
+  const runCode = () => {
+    const code = editorRef.current.getValue();
+
+    const iframe = document.createElement("iframe");
+    iframe.style.display = "none";
+    document.body.appendChild(iframe);
+
+    const iframeDoc = iframe.contentDocument;
+    iframeDoc.open();
+
+    iframeDoc.write(`
+      <script>
+        try {
+          let consoleOutput = "";
+          console.log = (...args) => {
+            consoleOutput += args.join(" ") + "\\n";
+          };
+
+          const result = (function() {
+            ${code}
+          })();
+
+          parent.postMessage({ result, consoleOutput }, "*");
+        } catch (err) {
+          parent.postMessage({ error: err.message }, "*");
+        }
+      </script>
+    `);
+
+    iframeDoc.close();
+  };
+
+  // Listen for output
+  useEffect(() => {
+    const handler = (e) => {
+      if (e.data.error) {
+        setOutput("❌ " + e.data.error);
+      } else {
+        setOutput(
+          (e.data.consoleOutput || "") +
+            (e.data.result !== undefined ? e.data.result : "")
+        );
+      }
+    };
+
+    window.addEventListener("message", handler);
+    return () => window.removeEventListener("message", handler);
+  }, []);
+
+  // Join
   const handleJoin = (e) => {
     e.preventDefault();
     const name = e.target.userName.value;
-
     setUserName(name);
     window.history.pushState({}, "", "?userName=" + name);
   };
 
-  // ✅ Join Screen
   if (!userName)
     return (
-      <main className='h-screen w-full bg-gray-950 flex items-center justify-center'>
-        <form className='flex flex-col gap-4' onSubmit={handleJoin}>
+      <main className="h-screen flex items-center justify-center bg-gray-900">
+        <form onSubmit={handleJoin} className="flex flex-col gap-3">
           <input
-            className='p-2 text-gray-950 rounded'
-            type='text'
             name="userName"
-            placeholder="Enter your name"
+            placeholder="Enter name"
+            className="p-2 rounded"
           />
-
-          <button
-            type='submit'
-            className='p-2 rounded-lg bg-amber-50 text-gray-950 font-bold'
-          >
+          <button className="bg-yellow-400 p-2 rounded font-bold">
             Join
           </button>
         </form>
       </main>
     );
 
-  // ✅ Main UI
   return (
-    <main className='h-screen w-full bg-gray-950 flex gap-4 p-4'>
-      <aside className='h-full w-1/4 bg-amber-50 rounded-lg'>
-        <div className='p-3 flex flex-col gap-2'>
-          <h2 className='font-bold text-lg mb-2'>Active Users</h2>
-
-          {users.length === 0 ? (
-            <p className='text-sm text-gray-500'>No users connected</p>
-          ) : (
-            users.map((user, idx) => (
-              <div
-                key={idx}
-                className='flex items-center gap-3 bg-white/80 rounded-lg p-2 shadow-sm'
-              >
-                <div className='w-8 h-8 rounded-full bg-amber-400 flex items-center justify-center font-bold text-gray-900'>
-                  {user.userName.charAt(0).toUpperCase()}
-                </div>
-
-                <p className='font-medium text-gray-900'>
-                  {user.userName}
-                </p>
-              </div>
-            ))
-          )}
-        </div>
+    <main className="h-screen flex gap-4 p-4 bg-gray-900 text-white">
+      
+      {/* Sidebar */}
+      <aside className="w-1/4 bg-yellow-100 text-black rounded p-3">
+        <h2 className="font-bold mb-2">Users</h2>
+        {users.map((u, i) => (
+          <p key={i}>{u.userName}</p>
+        ))}
       </aside>
 
-      <section className='w-3/4 bg-neutral-800 rounded-lg'>
+      {/* Editor + Output */}
+      <section className="w-3/4 flex flex-col gap-2">
+        <div className="flex gap-2">
+          <button
+            onClick={runCode}
+            className="bg-green-500 px-4 py-2 rounded"
+          >
+            ▶ Run
+          </button>
+
+          <button
+            onClick={() => setOutput("")}
+            className="bg-red-500 px-4 py-2 rounded"
+          >
+            Clear
+          </button>
+        </div>
+
         <Editor
-          height="90vh"
+          height="60vh"
           defaultLanguage="javascript"
-          defaultValue="// Write code here in JavaScript"
           theme="vs-dark"
           onMount={handleMount}
         />
+
+        <div className="bg-black text-green-400 p-3 h-40 overflow-auto rounded">
+        <h2 className="font-bold mb-2">Output</h2>
+          <pre>{output || "Run code to see output..."}</pre>
+        </div>
       </section>
     </main>
   );
