@@ -3,7 +3,7 @@ import { Editor } from "@monaco-editor/react";
 import "./App.css";
 import { MonacoBinding } from "y-monaco";
 import * as Y from "yjs";
-import { SocketIOProvider } from "y-socket.io";
+import { WebsocketProvider } from "y-websocket";
 
 const App = () => {
   const editorRef = useRef(null);
@@ -19,6 +19,7 @@ const App = () => {
 
   const [users, setUsers] = useState([]);
   const [output, setOutput] = useState("");
+  const DOMAIN = "wss://online-code-collaborator-server-ss.onrender.com" || "/"
 
   // Mount editor
   const handleMount = (editor) => {
@@ -38,9 +39,11 @@ const App = () => {
   useEffect(() => {
     if (!userName) return;
 
-    const provider = new SocketIOProvider("/", "monaco", ydoc, {
-      autoConnect: true,
-    });
+    const provider = new WebsocketProvider(
+      DOMAIN,
+      "monaco",
+      ydoc
+    );
 
     providerRef.current = provider;
 
